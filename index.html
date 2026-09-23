@@ -403,7 +403,7 @@
       ["So here's my promise, quiet but real", "to hold you gentler than before,", "to trust the love you've always given freely,", "and to never let your light dim again.", "You are mine to cherish, now and always."]
     ],
     heartLine: "Even the stars lean in.",
-    galleryTitle: "The beautiful woman I love",
+    galleryTitle: "To the beautiful woman I love",
     signature: "Always, and only, yours.",
     again: "Read it again"
   };
@@ -1296,7 +1296,6 @@
     // how far each section's centre sits from the viewport centre right now
     const nodes = [heroEl, ...secs.map(s => s.el)];
     const kinds = ['hero', ...secs.map(s => s.kind)];
-    const sides = [0, ...secs.map(s => s.side)];
     const ds = nodes.map(n => { const r = n.getBoundingClientRect(); return (r.top + r.bottom) / 2 - vh / 2; });
     let A = -1;
     for (let i = 0; i < ds.length; i++) { if (ds[i] <= 0) A = i; else break; }
@@ -1318,21 +1317,17 @@
     const halfH = Math.tan(camera.fov * Math.PI / 360) * dist;
     const Wh = Math.min(2.6, halfW * 1.85);
 
-    function posFor(kind, side) {
-      // A single comfortable resting height for the Moon on tall phones — high
-      // enough to clear the bottom-anchored text (even the longest stanza),
-      // low enough that it doesn't crowd the very top edge of the screen.
-      const mobileY = clamp(halfH * 0.7, 1.0, 1.9);
-      if (kind === 'hero') return { x: 0, y: portrait ? mobileY : 0.12, s: 1 };
-      if (kind === 'heart') return { x: 0, y: 0.2, s: 0.22 * Wh };
-      if (kind === 'gallery') return { x: 0, y: 1.35, s: 0.16 * Wh };
-      // A small nudge left or right per stanza, not a full swing to the side —
-      // on a narrow screen the Moon reads best staying close to centre, and a
-      // touch smaller so it never crowds the longer, five-line stanzas below it.
-      if (portrait) return { x: side * clamp(0.08 * halfW, 0, 0.22), y: mobileY, s: 0.86 };
-      return { x: side * Math.min(0.5 * halfW, halfW - 1.25), y: 0, s: 1 };
+    function posFor(kind) {
+      // The Moon holds dead centre for the whole poem — it doesn't sway, drift,
+      // or hop between the hero and each stanza. Only its size, distance, glow
+      // and light still change, so the "activity" reads as the Moon itself
+      // coming alive (growing, brightening, turning) rather than sliding around
+      // the screen. The photo gallery is the one exception: the Moon lifts
+      // slightly so it doesn't sit on top of the photos underneath it.
+      if (kind === 'gallery') return { x: 0, y: 1.1, s: 0.16 * Wh };
+      return { x: 0, y: 0, s: kind === 'heart' ? 0.22 * Wh : 1 };
     }
-    const pA = posFor(kinds[A], sides[A]), pB = posFor(kinds[B], sides[B]);
+    const pA = posFor(kinds[A]), pB = posFor(kinds[B]);
     const tx = pA.x + (pB.x - pA.x) * su;
     const ty = pA.y + (pB.y - pA.y) * su;
     const scaleT = pA.s + (pB.s - pA.s) * su;
