@@ -1319,13 +1319,17 @@
     const Wh = Math.min(2.6, halfW * 1.85);
 
     function posFor(kind, side) {
-      if (kind === 'hero') return { x: 0, y: portrait ? halfH * 0.5 : 0.12, s: 1 };
+      // A single comfortable resting height for the Moon on tall phones — high
+      // enough to clear the bottom-anchored text (even the longest stanza),
+      // low enough that it doesn't crowd the very top edge of the screen.
+      const mobileY = clamp(halfH * 0.7, 1.0, 1.9);
+      if (kind === 'hero') return { x: 0, y: portrait ? mobileY : 0.12, s: 1 };
       if (kind === 'heart') return { x: 0, y: 0.2, s: 0.22 * Wh };
       if (kind === 'gallery') return { x: 0, y: 1.35, s: 0.16 * Wh };
-      // On tall phones the moon sits above the text (scaled to the actual visible
-      // frustum, so it clears the words the same way on any screen), and it still
-      // sways gently left and right with each stanza rather than sitting frozen.
-      if (portrait) return { x: side * clamp(0.22 * halfW, 0, 0.55), y: clamp(halfH * 0.6, 0.75, 2.2), s: 1 };
+      // A small nudge left or right per stanza, not a full swing to the side —
+      // on a narrow screen the Moon reads best staying close to centre, and a
+      // touch smaller so it never crowds the longer, five-line stanzas below it.
+      if (portrait) return { x: side * clamp(0.08 * halfW, 0, 0.22), y: mobileY, s: 0.86 };
       return { x: side * Math.min(0.5 * halfW, halfW - 1.25), y: 0, s: 1 };
     }
     const pA = posFor(kinds[A], sides[A]), pB = posFor(kinds[B], sides[B]);
