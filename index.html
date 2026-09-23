@@ -403,7 +403,7 @@
       ["So here's my promise, quiet but real", "to hold you gentler than before,", "to trust the love you've always given freely,", "and to never let your light dim again.", "You are mine to cherish, now and always."]
     ],
     heartLine: "Even the stars lean in.",
-    galleryTitle: "The Woman I love the most",
+    galleryTitle: "Every version of us",
     signature: "Always, and only, yours.",
     again: "Read it again"
   };
@@ -930,7 +930,10 @@
   }
 
   /* ---------- The Moon's surface: a real Moon map, sharpened with fine procedural detail ---------- */
-  const TW = 2048, TH = 1024;
+  // Phones get a lighter texture and fewer craters baked, so the page builds
+  // faster and scrolls more smoothly on weaker GPUs.
+  const IS_PHONE = (window.matchMedia && window.matchMedia('(pointer: coarse)').matches) || Math.min(window.innerWidth, window.innerHeight) < 700;
+  const TW = IS_PHONE ? 1536 : 2048, TH = IS_PHONE ? 768 : 1024;
 
   async function buildMoonTextures() {
     const N = TW * TH;
@@ -986,7 +989,7 @@
     loader.textContent = 'Striking small craters…';
     await tick();
     const craters = [];
-    const NC = 12000, Rmin = 0.005, Rmax = 0.03;
+    const NC = IS_PHONE ? 7000 : 12000, Rmin = 0.005, Rmax = 0.03;
     const q = 1 - (Rmin / Rmax) * (Rmin / Rmax);
     for (let i = 0; i < NC; i++) {
       const R = Rmin / Math.sqrt(1 - rand() * q);
@@ -1094,6 +1097,7 @@
   /* ---------- Turning the Moon, and making a wish on a tap ---------- */
   const axis = new THREE.Vector3(), dq = new THREE.Quaternion();
   let vx = 0, vy = 0, dragId = null, lx = 0, ly = 0, tapStart = null, lastDragEnd = 0;
+  let gestureLock = null; // touch only: 'rotate' once a drag is clearly horizontal, 'scroll' once it's clearly vertical
 
   function rotateBy(dx, dy) {
     const angle = Math.hypot(dx, dy) * 0.0055 * (dist / 4.5);
@@ -1111,26 +1115,38 @@
     if (e.pointerType === 'mouse' && e.button !== 0) return;
     dragId = e.pointerId; lx = e.clientX; ly = e.clientY; vx = vy = 0;
     tapStart = { x: e.clientX, y: e.clientY, t: performance.now() };
+    // A mouse drag is always a rotate. A finger is ambiguous until it moves:
+    // it might be turning the Moon, or it might just be scrolling the page.
+    gestureLock = e.pointerType === 'mouse' ? 'rotate' : null;
     stage.classList.add('dragging');
   });
   window.addEventListener('pointermove', e => {
     if (e.pointerId !== dragId) return;
     const dx = e.clientX - lx, dy = e.clientY - ly;
+    if (gestureLock === null) {
+      // Decide once the finger has moved enough to show clear intent, so a normal
+      // vertical swipe scrolls the page untouched instead of also spinning the Moon.
+      const tdx = e.clientX - tapStart.x, tdy = e.clientY - tapStart.y;
+      if (Math.hypot(tdx, tdy) < 7) return;
+      gestureLock = Math.abs(tdx) > Math.abs(tdy) * 1.15 ? 'rotate' : 'scroll';
+      if (gestureLock === 'scroll') { stage.classList.remove('dragging'); return; }
+    }
+    if (gestureLock === 'scroll') return;
     lx = e.clientX; ly = e.clientY;
     rotateBy(dx, dy);
     vx = vx * 0.5 + dx * 0.5; vy = vy * 0.5 + dy * 0.5;
   });
   window.addEventListener('pointerup', e => {
     if (e.pointerId !== dragId) return;
-    if (tapStart && entered && Math.hypot(e.clientX - tapStart.x, e.clientY - tapStart.y) < 8 && performance.now() - tapStart.t < 450) {
+    if (gestureLock !== 'scroll' && tapStart && entered && Math.hypot(e.clientX - tapStart.x, e.clientY - tapStart.y) < 8 && performance.now() - tapStart.t < 450) {
       addWish(e.clientX, e.clientY);
       Sound.chime(WISH_NOTES[clamp(Math.floor(e.clientX / window.innerWidth * WISH_NOTES.length), 0, WISH_NOTES.length - 1)]);
     }
-    dragId = null; tapStart = null; lastDragEnd = performance.now();
+    dragId = null; tapStart = null; gestureLock = null; lastDragEnd = performance.now();
     stage.classList.remove('dragging');
   });
   window.addEventListener('pointercancel', e => {
-    if (e.pointerId === dragId) { dragId = null; tapStart = null; lastDragEnd = performance.now(); stage.classList.remove('dragging'); }
+    if (e.pointerId === dragId) { dragId = null; tapStart = null; gestureLock = null; lastDragEnd = performance.now(); stage.classList.remove('dragging'); }
   });
 
   /* ---------- Overlay: petals, a shooting star, and wishes ---------- */
@@ -1299,13 +1315,17 @@
     dist += (distT - dist) * Math.min(1, 0.12 * dt);
     camera.position.z = dist;
     const halfW = Math.tan(camera.fov * Math.PI / 360) * dist * camera.aspect;
+    const halfH = Math.tan(camera.fov * Math.PI / 360) * dist;
     const Wh = Math.min(2.6, halfW * 1.85);
 
     function posFor(kind, side) {
-      if (kind === 'hero') return { x: 0, y: portrait ? 0.55 : 0.12, s: 1 };
+      if (kind === 'hero') return { x: 0, y: portrait ? halfH * 0.5 : 0.12, s: 1 };
       if (kind === 'heart') return { x: 0, y: 0.2, s: 0.22 * Wh };
       if (kind === 'gallery') return { x: 0, y: 1.35, s: 0.16 * Wh };
-      if (portrait) return { x: 0, y: 1.2, s: 1 };
+      // On tall phones the moon sits above the text (scaled to the actual visible
+      // frustum, so it clears the words the same way on any screen), and it still
+      // sways gently left and right with each stanza rather than sitting frozen.
+      if (portrait) return { x: side * clamp(0.22 * halfW, 0, 0.55), y: clamp(halfH * 0.6, 0.75, 2.2), s: 1 };
       return { x: side * Math.min(0.5 * halfW, halfW - 1.25), y: 0, s: 1 };
     }
     const pA = posFor(kinds[A], sides[A]), pB = posFor(kinds[B], sides[B]);
